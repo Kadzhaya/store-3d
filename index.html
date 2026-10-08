@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Магазин №1 · 3D-планировка</title>
+<meta name="description" content="Интерактивная 3D-модель торгового зала: осмотр, перестановка оборудования, проверка проходов">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231e5bd8'/%3E%3Cpath d='M7 13l9-6 9 6v12H7z' fill='%23fff'/%3E%3Crect x='11' y='17' width='4' height='8' fill='%231e5bd8'/%3E%3Crect x='17' y='17' width='5' height='4' fill='%231e5bd8'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.min.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body>
+<header class="bar">
+  <div class="brand"><span class="logo">▣</span><span class="title">Магазин №1</span><span class="sub">3D-планировка</span></div>
+  <div class="seg" role="tablist" aria-label="Режим просмотра">
+    <button data-mode="plan" title="Вид сверху, как на схеме (клавиша 1)">План</button>
+    <button data-mode="orbit" class="on" title="Свободный облет (клавиша 2)">3D</button>
+    <button data-mode="walk" title="Прогулка от первого лица (клавиша 3)">Прогулка</button>
+  </div>
+  <div class="tools">
+    <button id="bUndo" title="Отменить (Ctrl+Z)">↶</button>
+    <button id="bRedo" title="Повторить (Ctrl+Y)">↷</button>
+    <button id="bLabels" class="tog on" title="Показать/скрыть подписи">Подписи</button>
+    <button id="bLow" class="tog" title="Срезать стены до 1,2 м, чтобы видеть зал целиком">Низкие стены</button>
+    <button id="bShare" class="primary" title="Скопировать ссылку на текущую расстановку">Поделиться</button>
+    <button id="bMenu" title="Еще">⋯</button>
+  </div>
+  <div class="menu" id="menu" hidden>
+    <button id="mExport">Выгрузить в Excel</button>
+    <label class="mbtn">Загрузить из Excel<input type="file" id="mImport" accept=".xlsx,.xls,.csv" hidden></label>
+    <button id="mPng">Сохранить картинку (PNG)</button>
+    <button id="mReset">Вернуть исходную схему</button>
+    <button id="mHelp">Как пользоваться</button>
+  </div>
+</header>
+
+<main>
+  <div id="view">
+    <div id="hud" class="hud"></div>
+    <div id="walkpad" class="walkpad" hidden>
+      <button data-k="fw">▲</button>
+      <button data-k="lt">⟲</button><button data-k="bw">▼</button><button data-k="rt">⟳</button>
+    </div>
+    <div id="toast" class="toast" hidden></div>
+  </div>
+
+  <aside id="side" class="side">
+    <nav class="tabs" role="tablist">
+      <button data-tab="obj" class="on">Объект</button>
+      <button data-tab="chk">Проверки <span id="chkBadge" class="badge" hidden></span></button>
+      <button data-tab="add">Добавить</button>
+      <button data-tab="var">Варианты</button>
+      <button id="sideToggle" class="grip" title="Свернуть/развернуть панель">▾</button>
+    </nav>
+    <section data-pane="obj" class="pane on" id="paneObj"></section>
+    <section data-pane="chk" class="pane" id="paneChk"></section>
+    <section data-pane="add" class="pane" id="paneAdd"></section>
+    <section data-pane="var" class="pane" id="paneVar"></section>
+  </aside>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" class="dlg">
+    <h3 id="dlgTitle"></h3>
+    <div id="dlgBody"></div>
+    <div class="dlg-actions" id="dlgActions"><button value="ok" class="primary">Понятно</button></div>
+  </form>
+</dialog>
+
+<div id="loading" class="loading">Загружаю модель…</div>
+<script src="vendor/xlsx/xlsx.mini.min.js" defer></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
