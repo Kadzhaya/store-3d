@@ -1406,3 +1406,31 @@ B.adm = (W, D, H, p) => {
   lbl.position.set(0, H - 0.06, D * 0.2 + 0.001); g.add(lbl);
   return g;
 };
+
+// Мелочи на обеденном столе: кружки, тарелка, салфетница, миска с фруктами, блокнот, бутылка воды
+B.tableclutter = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const white = new THREE.MeshPhongMaterial({ color: 0xfafafa, shininess: 60 });
+  const mug = (x, z, c) => {
+    g.add(cylY(0.04, 0.038, 0.095, mat(c), x, 0, z, 14));
+    const h = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.007, 6, 12), mat(c));
+    h.position.set(x + 0.045, 0.05, z); g.add(h);
+  };
+  mug(-W * 0.3, D * 0.25, '#e57373'); mug(-W * 0.18, D * 0.3, '#64b5f6');
+  g.add(cylY(0.12, 0.1, 0.018, white, W * 0.15, 0, D * 0.15, 20));
+  g.add(cylY(0.03, 0.03, 0.04, mat('#d7a86e'), W * 0.15, 0.018, D * 0.15, 10));
+  g.add(box(0.12, 0.09, 0.05, mat('#c9ced4'), W * 0.35, 0, -D * 0.3));
+  g.add(box(0.1, 0.05, 0.03, white, W * 0.35, 0.06, -D * 0.3, false));
+  const bowl = latheY([[0.03, 0], [0.11, 0.05], [0.12, 0.07], [0.0, 0.07]], mat('#5d4037'), -W * 0.05, 0, -D * 0.25, 18);
+  g.add(bowl);
+  for (const [dx, dz, c] of [[-0.04, 0, '#c62828'], [0.04, 0.01, '#9ccc65'], [0, -0.05, '#fb8c00'], [0.01, 0.05, '#c62828']]) {
+    const f = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), mat(c));
+    f.position.set(-W * 0.05 + dx, 0.075, -D * 0.25 + dz); f.castShadow = true; g.add(f);
+  }
+  g.add(box(0.15, 0.012, 0.21, mat('#1e5bd8'), -W * 0.3, 0, -D * 0.2));
+  const pen = cylY(0.005, 0.005, 0.14, mat('#212121'), 0, 0, 0, 6);
+  pen.rotation.z = Math.PI / 2; pen.position.set(-W * 0.3, 0.018, -D * 0.12); g.add(pen);
+  g.add(latheY([[0.032, 0], [0.033, 0.17], [0.016, 0.21], [0.016, 0.23], [0, 0.23]], new THREE.MeshPhongMaterial({ color: 0xcfe9f7, shininess: 80 }), W * 0.38, 0, D * 0.3, 12));
+  g.add(cylY(0.017, 0.017, 0.02, mat('#1565c0'), W * 0.38, 0.23, D * 0.3, 10));
+  return g;
+};
