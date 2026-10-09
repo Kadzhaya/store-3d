@@ -1328,3 +1328,81 @@ B.cupboard = (W, D, H, p) => {
   g.add(box(W - 0.02, 0.025, 0.02, edge, 0, H - 0.05, D / 2 - 0.01, false), box(0.025, gh, 0.02, edge, 0, split + 0.03, D / 2 - 0.01, false));
   return g;
 };
+
+// ---------------------------------------------------------------- КПП и главная касса
+// Холодильник бытовой (по грудь): корпус, дверь с ручкой, морозильная дверца сверху
+B.homefridge = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const white = new THREE.MeshPhongMaterial({ color: 0xf6f7f8, shininess: 40, specular: 0x444444 });
+  g.add(box(W - 0.02, 0.06, D - 0.06, mat('#3a3d42'), 0, 0, -0.02));
+  g.add(box(W, H - 0.06, D - 0.05, white, 0, 0.06, -0.025));
+  const fz = Math.min(0.32, H * 0.28);
+  g.add(box(W - 0.01, H - 0.08 - fz - 0.01, 0.05, white, 0, 0.07, D / 2 - 0.025));
+  g.add(box(W - 0.01, fz, 0.05, white, 0, H - fz - 0.005, D / 2 - 0.025));
+  g.add(box(W - 0.02, 0.006, 0.052, mat('#c9ced4'), 0, H - fz - 0.012, D / 2 - 0.025, false));
+  const hdl = mat('#b9bec4');
+  g.add(box(0.025, 0.3, 0.03, hdl, W / 2 - 0.07, H - fz - 0.4, D / 2 + 0.015));
+  g.add(box(0.025, 0.14, 0.03, hdl, W / 2 - 0.07, H - fz + 0.08, D / 2 + 0.015));
+  return g;
+};
+// Микроволновая печь: белый корпус, затемненное окно дверцы, панель управления, ручка
+B.microwave = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const mw = Math.min(W, 0.5), md = Math.min(D, 0.38), mh = Math.min(H, 0.29);
+  const white = new THREE.MeshPhongMaterial({ color: 0xf8f8f8, shininess: 50, specular: 0x555555 });
+  g.add(box(mw, mh, md, white, 0, 0, 0));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(cylY(0.012, 0.012, 0.012, mat('#333'), sx * (mw / 2 - 0.04), -0.012, sz * (md / 2 - 0.04), 8));
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(mw * 0.55, mh * 0.62), new THREE.MeshPhongMaterial({ color: 0x1d2329, shininess: 90, specular: 0x777777 }));
+  win.position.set(-mw * 0.12, mh / 2, md / 2 + 0.002); g.add(win);
+  g.add(box(0.02, mh * 0.6, 0.025, mat('#d0d4d8'), mw * 0.2, mh * 0.2, md / 2 + 0.012));
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(mw * 0.2, mh * 0.82), mat('#eef0f2'));
+  panel.position.set(mw * 0.37, mh / 2, md / 2 + 0.002); g.add(panel);
+  const disp = new THREE.Mesh(new THREE.PlaneGeometry(mw * 0.14, 0.03), screenMat);
+  disp.position.set(mw * 0.37, mh * 0.8, md / 2 + 0.004); g.add(disp);
+  for (let i = 0; i < 2; i++) {
+    const k = cylY(0.018, 0.018, 0.015, mat('#9ea3a8'), 0, 0, 0, 14);
+    k.rotation.x = Math.PI / 2; k.position.set(mw * 0.37, mh * (0.5 - i * 0.28), md / 2 + 0.01); g.add(k);
+  }
+  return g;
+};
+// Сейф: толстые стенки, дверь с петлями слева, кодовый замок и поворотная ручка
+B.safe = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const steelDark = new THREE.MeshPhongMaterial({ color: 0x3b4046, shininess: 35, specular: 0x555555 });
+  g.add(box(W, H, D - 0.06, steelDark, 0, 0, -0.03));
+  g.add(box(W - 0.06, H - 0.06, 0.06, mat('#454b52'), 0, 0.03, D / 2 - 0.03));
+  for (const y of [0.15, H - 0.25]) g.add(cylY(0.018, 0.018, 0.1, steel(), -W / 2 + 0.02, y, D / 2 - 0.01, 10));
+  const pad = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.12), mat('#1f2328'));
+  pad.position.set(W * 0.18, H * 0.68, D / 2 + 0.002); g.add(pad);
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.02), screenMat);
+  scr.position.set(W * 0.18, H * 0.68 + 0.04, D / 2 + 0.003); g.add(scr);
+  const hub = cylY(0.035, 0.035, 0.03, steel(), 0, 0, 0, 16);
+  hub.rotation.x = Math.PI / 2; hub.position.set(W * 0.18, H * 0.45, D / 2 + 0.015); g.add(hub);
+  for (let i = 0; i < 3; i++) {
+    const s = box(0.012, 0.11, 0.012, steel(), 0, 0, 0, false);
+    s.position.set(W * 0.18, H * 0.45, D / 2 + 0.035); s.rotation.z = i * Math.PI / 3; g.add(s);
+  }
+  return g;
+};
+// АДМ (депозитарная машина): корпус, сенсорный экран, купюроприемник, кардридер, принтер, подсветка
+B.adm = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const body = new THREE.MeshPhongMaterial({ color: 0x4a5a6a, shininess: 30 });
+  g.add(box(W, 0.08, D - 0.04, plinth(), 0, 0, -0.02));
+  g.add(box(W, H - 0.08, D * 0.7, body, 0, 0.08, -D * 0.15));
+  // наклонная лицевая часть с экраном
+  const fascia = new THREE.Group();
+  fascia.add(box(W - 0.02, 0.52, 0.06, mat('#dfe3e8'), 0, 0, 0));
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.5, 0.26), screenMat); scr.position.set(0, 0.3, 0.031); fascia.add(scr);
+  fascia.add(box(W * 0.5, 0.03, 0.03, mat('#111'), 0, 0.07, 0.03, false));
+  fascia.position.set(0, H - 0.72, D * 0.2 + 0.06); fascia.rotation.x = -0.15;
+  g.add(fascia);
+  g.add(box(W, 0.9, D * 0.3, mat('#e9ebee'), 0, 0.08, D * 0.35));
+  g.add(box(W * 0.5, 0.025, 0.03, mat('#111'), 0, 0.82, D / 2 + 0.002, false));
+  g.add(box(0.08, 0.05, 0.03, mat('#111'), W * 0.3, 0.72, D / 2 + 0.002, false));
+  g.add(box(W * 0.3, 0.015, 0.02, mat('#111'), -W * 0.2, 0.6, D / 2 + 0.002, false));
+  g.add(box(W, 0.12, D * 0.7, mat('#1e5bd8'), 0, H - 0.12, -D * 0.15));
+  const lbl = signPlane('АДМ', W * 0.6, 0.09, '#1e5bd8', '#ffffff');
+  lbl.position.set(0, H - 0.06, D * 0.2 + 0.001); g.add(lbl);
+  return g;
+};
