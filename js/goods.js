@@ -94,6 +94,8 @@ const GEO_DEF = {
   'salad.body': () => bx(.13, .05, .1),
   'salad.lid': () => bx(.132, .012, .102, .05),
   'cig.body': () => bx(.055, .088, .022),
+  'gum.body': () => bx(.075, .1, .02),
+  'bar.body': () => bx(.03, .14, .022),
   'carton.body': () => bx(.2, .16, .14),
   'apple': () => sph(.038), 'orange': () => sph(.041), 'lemon': () => sph(.032, 1.3, 1, 1),
   'pear': () => sph(.036, 1, 1.3, 1), 'potato': () => sph(.034, 1.35, .8, 1), 'tomato': () => sph(.035, 1, .8, 1),
@@ -199,6 +201,8 @@ const A = {
   cake: { w: .205, d: .205, h: .085, stack: 2, c: [['cake.body', P.cake], ['cake.top', P.cakeTop]] },
   salad: { w: .135, d: .105, h: .062, stack: 3, c: [['salad.body', P.salad], ['salad.lid', '#e8f4fb']] },
   cig: { w: .058, d: .024, h: .09, stack: 2, c: [['cig.body', P.cig]] },
+  gum: { w: .08, d: .024, h: .1, c: [['gum.body', ['#43a047', '#1e88e5', '#e53935', '#fdd835', '#ffffff', '#8e24aa']]] },
+  bar: { w: .034, d: .026, h: .14, c: [['bar.body', ['#5d4037', '#c62828', '#1565c0', '#fdd835', '#2e7d32', '#212121']]] },
   carton: { w: .205, d: .145, h: .16, stack: 2, c: [['carton.body', ['#c8a165', '#d7b98e', '#bcaaa4']]] },
 };
 
