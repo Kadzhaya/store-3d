@@ -1110,31 +1110,46 @@ B.checkout = (W, D, H, p) => {
   g.add(box(0.16, 0.14, 0.2, mat('#3a3d42'), W / 2 - 0.14, H - 0.15, -D / 2 + 0.15));
   return g;
 };
-// Лента: корпус, рама с закругленным торцом, черное полотно, кнопка стоп
+// Лента: корпус, рама с закругленным торцом, черное полотно, кнопка стоп.
+// Если в подписи есть «импульс», на лицевой панели со стороны покупателя ниже столешницы
+// появляются полочки с батончиками, жвачкой и энергетиками: обзор над лентой остается свободным.
 B.belt = (W, D, H, p) => {
   const g = new THREE.Group();
-  const long = W >= D, L = long ? W : D, S = long ? D : W;
+  const imp = /импульс/i.test(p.label || '');
+  const long = W >= D, L = long ? W : D, S0 = long ? D : W;
+  const sd = imp ? 0.11 : 0;
+  const S = S0 - sd, off = -sd / 2; // корпус сдвинут назад, спереди полочки
   const along = (len, h, wid, material, o, y0, s = 0, shadow = true) =>
-    long ? box(len, h, wid, material, o, y0, s, shadow) : box(wid, h, len, material, s, y0, o, shadow);
+    long ? box(len, h, wid, material, o, y0, s + off, shadow) : box(wid, h, len, material, s + off, y0, o, shadow);
   const col = p.color || '#5f6669';
   g.add(along(L - 0.02, 0.08, S - 0.04, plinth(), 0, 0));
   g.add(along(L, H - 0.2, S, mat(col), 0, 0.08));
   g.add(along(L, 0.12, S + 0.04, mat('#6c7377'), 0, H - 0.12));
   const end = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, S + 0.04, 16), mat('#6c7377'));
-  if (long) { end.rotation.x = Math.PI / 2; end.position.set(L / 2, H - 0.06, 0); }
-  else { end.rotation.z = Math.PI / 2; end.position.set(0, H - 0.06, L / 2); }
+  if (long) { end.rotation.x = Math.PI / 2; end.position.set(L / 2, H - 0.06, off); }
+  else { end.rotation.z = Math.PI / 2; end.position.set(off, H - 0.06, L / 2); }
   g.add(end);
   const bw = Math.min(S - 0.14, 0.48);
   g.add(along(L - 0.12, 0.014, bw, mat('#151515'), 0, H, 0, false));
   for (const s of [-1, 1]) g.add(along(L - 0.06, 0.03, 0.03, steel(), 0, H, s * (bw / 2 + 0.02)));
   g.add(along(0.4, 0.04, 0.05, mat('#2f6fd6'), L * 0.2, H + 0.01, 0, false));
-  // пульт и кнопка аварийной остановки со стороны кассира
   const sx = -L / 2 + 0.14;
-  g.add(long ? box(0.16, 0.1, 0.01, mat('#e9ebee'), sx, H - 0.25, -S / 2 - 0.005, false) : box(0.01, 0.1, 0.16, mat('#e9ebee'), -S / 2 - 0.005, H - 0.25, sx, false));
+  g.add(long ? box(0.16, 0.1, 0.01, mat('#e9ebee'), sx, H - 0.25, -S0 / 2 - 0.005, false) : box(0.01, 0.1, 0.16, mat('#e9ebee'), -S0 / 2 - 0.005, H - 0.25, sx, false));
   const stop = cylY(0.025, 0.025, 0.03, mat('#d32f2f'), 0, 0, 0, 12);
   stop.rotation.x = Math.PI / 2;
-  if (long) stop.position.set(sx + 0.15, H - 0.3, -S / 2 - 0.01); else stop.position.set(-S / 2 - 0.01, H - 0.3, sx + 0.15);
+  if (long) stop.position.set(sx + 0.15, H - 0.3, -S0 / 2 - 0.01); else stop.position.set(-S0 / 2 - 0.01, H - 0.3, sx + 0.15);
   g.add(stop);
+  if (imp && long) {
+    const st = stockFor({ label: 'impulse' }, L);
+    const z0 = S0 / 2 - sd, z1 = S0 / 2;
+    [[0.18, 'energy'], [0.42, 'bar'], [0.62, 'gum']].forEach(([y, kind]) => {
+      g.add(box(L - 0.1, 0.012, sd, mat('#d6dade'), 0, y, (z0 + z1) / 2, false));
+      g.add(box(L - 0.1, 0.035, 0.008, mat('#e53935'), 0, y, z1 - 0.004, false));
+      st.shelf(kind, -L / 2 + 0.08, L / 2 - 0.08, y + 0.012, z1 - 0.01, z0, 0.17, { rows: 2 });
+    });
+    for (const sxx of [-1, 1]) g.add(box(0.02, 0.6, sd, mat('#3a3d42'), sxx * (L / 2 - 0.05), 0.12, (z0 + z1) / 2, false));
+    addStock(g, st);
+  }
   return g;
 };
 // Прикассовая навеска над лентой: жевательная резинка и батончики
