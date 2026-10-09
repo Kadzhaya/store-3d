@@ -562,8 +562,19 @@ function setLowWalls(on) {
   $('#bLow').classList.toggle('on', on);
   building.walls.scale.y = on ? 1200 / data.meta.ceiling : 1;
   building.beams.visible = !on && mode !== 'plan';
+  building.doors.tall.visible = !on; // дуги открывания на полу остаются
+  if (building.facade) building.facade.root.visible = !on;
 }
 $('#bLow').onclick = () => setLowWalls(!lowWalls);
+$('#bStreet').onclick = () => {
+  if (lowWalls) setLowWalls(false);
+  setMode('orbit');
+  const fy = (data.facade?.y ?? by1) * M, x = 6.7;
+  orbit.target.set(x, 3.2, fy);
+  persp.position.set(x - 2.5, 2.2, fy + 12);
+  orbit.update();
+  toast('Вид на вход с улицы. Вращайте мышкой, чтобы осмотреть фасад');
+};
 
 // ---------------------------------------------------------------- прогулка
 const walk = { x: 0, y: 0, yaw: 0, pitch: 0, keys: new Set(), look: null, init: false };
@@ -585,7 +596,10 @@ document.querySelectorAll('#walkpad button').forEach(b => {
   const up = () => walk.keys.delete(k);
   b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
 });
+const FY = data.facade ? data.facade.y : Infinity;
+function onStreet(x, y) { return y > FY + 150 && y < FY + 5000 && x > -2500 && x < 16000; }
 function walkBlocked(x, y) {
+  if (onStreet(x, y)) return false;
   if (raster.isWall(x, y) || !raster.isInside(x, y)) return true;
   for (const o of objs.values()) {
     if (Math.abs(o.it.x - x) > (o.it.w + o.it.d) || Math.abs(o.it.y - y) > (o.it.w + o.it.d)) continue;
@@ -857,6 +871,12 @@ function frame() {
   if (mode === 'walk') stepWalk(dt);
   else if (mode === 'orbit') orbit.update();
   else planCtl.update();
+  if (building.facade) { // этажи дома видны только с улицы, иначе закрывали бы зал
+    const cp = camera.position;
+    const outside = cp.z > building.facade.y + 0.5;
+    building.facade.upper.visible = !lowWalls && outside && (mode === 'walk' || (mode === 'orbit' && cp.y < 9));
+    labelRenderer.domElement.style.visibility = outside && cp.y < 9 && mode !== 'plan' ? 'hidden' : ''; // с улицы подписи мешают
+  }
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
   requestAnimationFrame(frame);

@@ -560,9 +560,11 @@ export function buildBuilding(data) {
       walls.add(box(dw, 0.06, 0.1, mat('#5b6068'), (w.door[0] + w.door[1]) / 2 * M, dh, z));
     }
     walls.add(box(L, 0.05, 0.1, mat('#5b6068'), cx, w.sill * M + w.h * M, z));
-    if (w.sill > 0) walls.add(box(L, w.sill * M, 0.2, mat('#b9bcc2'), cx, 0, z));
+    // снаружи (+Z, сторона улицы) графитовые панели, изнутри светлая стена
+    const sp = [mat('#b9bcc2'), mat('#b9bcc2'), mat('#b9bcc2'), mat('#b9bcc2'), mat('#45484d'), mat('#d9d6cf')];
+    if (w.sill > 0) walls.add(box(L, w.sill * M, 0.2, w.kind === 'glass' ? mat('#b9bcc2') : sp, cx, 0, z));
     const top = (w.sill + w.h) * M;
-    if (w.kind !== 'glass' && top < C) walls.add(box(L, C - top, 0.2, mat('#b9bcc2'), cx, top, z));
+    if (w.kind !== 'glass' && top < C) walls.add(box(L, C - top, 0.2, sp, cx, top, z));
   }
   for (const l of data.lintels || []) {
     walls.add(box((l.x1 - l.x0) * M, C - l.y0h * M, (l.y1 - l.y0) * M, wm.struct, (l.x0 + l.x1) / 2 * M, l.y0h * M, (l.y0 + l.y1) / 2 * M));
@@ -609,5 +611,268 @@ export function buildBuilding(data) {
     labels.add(m);
   }
   root.add(labels);
-  return { root, walls, beams, labels, floor };
+  const doors = buildDoors(data);
+  root.add(doors.root);
+  const facade = buildFacade(data);
+  if (facade) root.add(facade.root);
+  return { root, walls, beams, labels, floor, doors, facade };
+}
+
+// ---------------------------------------------------------------- двери
+const v2 = a => new THREE.Vector2(a[0] * M, a[1] * M);
+function placed(mesh, x, y, z, rotY) { mesh.position.set(x, y, z); mesh.rotation.y = rotY; return mesh; }
+function boxAt(L, H, T, material, x, y0, z, rotY, shadow = true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(L, H, T), material);
+  if (shadow) { m.castShadow = true; m.receiveShadow = true; }
+  return placed(m, x, y0 + H / 2, z, rotY);
+}
+const rotOf = u => Math.atan2(-u.y, u.x);
+function arcLine(H, c, o, R, color) {
+  const pts = [];
+  const a0 = Math.atan2(c.y, c.x);
+  let da = Math.atan2(o.y, o.x) - a0;
+  if (da > Math.PI) da -= 2 * Math.PI;
+  if (da < -Math.PI) da += 2 * Math.PI;
+  for (let i = 0; i <= 24; i++) {
+    const a = a0 + da * i / 24;
+    pts.push(new THREE.Vector3(H.x + Math.cos(a) * R, 0.012, H.y + Math.sin(a) * R));
+  }
+  pts.push(new THREE.Vector3(H.x, 0.012, H.y));
+  pts.push(new THREE.Vector3(H.x + o.x * R, 0.012, H.y + o.y * R));
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color, dashSize: 0.08, gapSize: 0.05 }));
+  l.computeLineDistances();
+  // заливка зоны открывания: на плане сразу видно, где дверь
+  const sec = new THREE.Mesh(new THREE.CircleGeometry(R, 24, Math.min(-a0, -(a0 + da)), Math.abs(da)),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.22, depthWrite: false }));
+  sec.rotation.x = -Math.PI / 2;
+  sec.position.set(H.x, 0.01, H.y);
+  const g = new THREE.Group();
+  g.add(l, sec);
+  return g;
+}
+function leafGlass(W, H) {
+  const g = new THREE.Group();
+  const fr = mat('#2f3338'), t = 0.045;
+  const gl = new THREE.Mesh(new THREE.PlaneGeometry(W - 2 * t, H - 2 * t), glassMat);
+  gl.position.set(W / 2, H / 2, 0);
+  g.add(gl);
+  g.add(boxAt(W, t, 0.05, fr, W / 2, 0, 0, 0), boxAt(W, t, 0.05, fr, W / 2, H - t, 0, 0));
+  g.add(boxAt(t, H, 0.05, fr, t / 2, 0, 0, 0), boxAt(t, H, 0.05, fr, W - t / 2, 0, 0, 0));
+  g.add(boxAt(0.03, 0.9, 0.03, mat('#b0b5bb'), W - 0.12, 0.6, 0.06, 0), boxAt(0.03, 0.9, 0.03, mat('#b0b5bb'), W - 0.12, 0.6, -0.06, 0));
+  return g;
+}
+function leafSolid(W, H, color) {
+  const g = new THREE.Group();
+  g.add(boxAt(W, H, 0.04, mat(color), W / 2, 0, 0, 0));
+  const h = mat('#9ea3a8');
+  g.add(boxAt(0.12, 0.025, 0.03, h, W - 0.12, 1.0, 0.04, 0), boxAt(0.12, 0.025, 0.03, h, W - 0.12, 1.0, -0.04, 0));
+  return g;
+}
+// полотно, повернутое на петле: dir — направление от петли к свободному краю
+function hangLeaf(leaf, Hp, dir) {
+  const w = new THREE.Group();
+  w.add(leaf);
+  w.position.set(Hp.x, 0, Hp.y);
+  w.rotation.y = rotOf(dir);
+  return w;
+}
+export function buildDoors(data) {
+  const root = new THREE.Group(), tall = new THREE.Group(), flat = new THREE.Group();
+  root.name = 'doors';
+  root.add(tall, flat);
+  const OPEN = 75 * Math.PI / 180;
+  for (const d of data.doors || []) {
+    const a = v2(d.a), b = v2(d.b), L = a.distanceTo(b);
+    const u = b.clone().sub(a).normalize();
+    const n = new THREE.Vector2(d.into[0], d.into[1]);
+    const t = d.t * M, top = d.top * M, ry = rotOf(u);
+    const mid = a.clone().add(b).multiplyScalar(0.5);
+    const cx = mid.x + n.x * t / 2, cz = mid.y + n.y * t / 2;
+    // порог
+    const th = new THREE.Mesh(new THREE.PlaneGeometry(L, Math.max(t, 0.06)), mat('#c2bcae'));
+    th.rotation.x = -Math.PI / 2; th.rotation.z = ry;
+    th.position.set(cx, 0.008, cz);
+    flat.add(th);
+    if (d.kind === 'glass2') {
+      const o = new THREE.Vector2(d.out[0], d.out[1]);
+      const W = L / 2 - 0.02;
+      for (const [Hp, c] of [[a, u.clone()], [b, u.clone().negate()]]) {
+        const dir = c.clone().multiplyScalar(Math.cos(OPEN * 0.85)).add(o.clone().multiplyScalar(Math.sin(OPEN * 0.85))).normalize();
+        tall.add(hangLeaf(leafGlass(W, 2.08), Hp.clone().add(c.clone().multiplyScalar(0.02)), dir));
+        flat.add(arcLine(Hp, c, o, W, 0x2563eb));
+      }
+      if (d.transom && top > 2.1) {
+        const tr = new THREE.Mesh(new THREE.PlaneGeometry(L, top - 2.1), glassMat);
+        tr.position.set(mid.x, 2.1 + (top - 2.1) / 2, mid.y); tr.rotation.y = ry;
+        tall.add(tr);
+        tall.add(boxAt(L, 0.06, 0.08, mat('#2f3338'), mid.x, 2.07, mid.y, ry));
+      }
+      continue;
+    }
+    // перемычка над дверью и коробка
+    const wallMat = mat(d.kind === 'fire' ? '#ead7ea' : '#f3f1ec');
+    if (top > 2.1) tall.add(boxAt(L, top - 2.1, t, wallMat, cx, 2.1, cz, ry));
+    const fr = mat(d.kind === 'fire' ? '#6b7078' : '#8d8f93');
+    for (const p of [a.clone().add(u.clone().multiplyScalar(0.03)), b.clone().sub(u.clone().multiplyScalar(0.03))])
+      tall.add(boxAt(0.06, 2.1, t + 0.03, fr, p.x + n.x * t / 2, 0, p.y + n.y * t / 2, ry));
+    tall.add(boxAt(L, 0.06, t + 0.03, fr, cx, 2.04, cz, ry));
+    // полотно, приоткрытое по дуге со схемы
+    const Hp = v2(d.hinge);
+    const other = Hp.distanceTo(a) < 0.01 ? b : a;
+    const c = other.clone().sub(Hp).normalize();
+    const o = v2(d.swing).sub(Hp).normalize();
+    const W = L - 0.08;
+    // служебные двери открываются в узкий коридор: показываем их приоткрытыми, чтобы не перегораживали вид
+    const ang = d.kind === 'fire' ? OPEN : 30 * Math.PI / 180;
+    const dir = c.clone().multiplyScalar(Math.cos(ang)).add(o.clone().multiplyScalar(Math.sin(ang))).normalize();
+    tall.add(hangLeaf(leafSolid(W, 2.03, d.kind === 'fire' ? '#9aa0a6' : '#e9e4d8'), Hp.clone().add(c.clone().multiplyScalar(0.04)), dir));
+    flat.add(arcLine(Hp, c, o, W, d.kind === 'fire' ? 0x1f8a4c : 0x2563eb));
+    // табличка над дверью со стороны открывания
+    if (d.label) {
+      const fire = d.kind === 'fire';
+      const sw = Math.min(Math.max(L * 1.2, 0.6), 2.2);
+      const sg = signPlane(d.label, sw, fire ? 0.22 : 0.18, fire ? '#1f8a4c' : '#ffffff', fire ? '#ffffff' : '#1d2330');
+      sg.position.set(mid.x - n.x * 0.012, 2.32, mid.y - n.y * 0.012);
+      sg.rotation.y = Math.atan2(-n.x, -n.y);
+      tall.add(sg);
+    }
+  }
+  return { root, tall, flat };
+}
+
+// ---------------------------------------------------------------- фасад со стороны входа
+function pavingTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#9b8f84'; g.fillRect(0, 0, 256, 256);
+  const cols = ['#b2a596', '#a69887', '#bcae9e', '#9f9182', '#c2b5a5'];
+  // елочка из брусчатки 20x10 см
+  for (let y = -64; y < 320; y += 32) for (let x = -64; x < 320; x += 64) {
+    for (const [dx, dy, w, h] of [[0, 0, 62, 30], [32, 16, 30, 62]]) {
+      g.fillStyle = cols[(x * 7 + y * 3 + dx) & 3];
+      g.fillRect(x + dx + 1, y + dy + 1, w - 2, h - 2);
+    }
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  return t;
+}
+function facadeTexture(Wm, Hm, floors, floorH) {
+  const pxm = 120, W = Math.round(Wm * pxm), H = Math.round(Hm * pxm);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const X = m => m * pxm, Y = m => H - m * pxm; // м от низа
+  g.fillStyle = '#4a4d52'; g.fillRect(0, 0, W, H);
+  g.strokeStyle = '#3f4246'; g.lineWidth = 2;
+  for (let x = 0; x < Wm; x += 0.6) { g.beginPath(); g.moveTo(X(x), 0); g.lineTo(X(x), H); g.stroke(); }
+  for (let y = 0; y < Hm; y += 1.2) { g.beginPath(); g.moveTo(0, Y(y)); g.lineTo(W, Y(y)); g.stroke(); }
+  // оранжевая вставка справа
+  g.fillStyle = '#d9a03c'; g.fillRect(X(Wm * 0.68), 0, X(Wm * 0.2), H);
+  g.strokeStyle = '#c48e30';
+  for (let y = 0; y < Hm; y += 0.6) { g.beginPath(); g.moveTo(X(Wm * 0.68), Y(y)); g.lineTo(X(Wm * 0.88), Y(y)); g.stroke(); }
+  const glazing = (x0, x1, y0, y1, curtains) => {
+    g.fillStyle = '#2b2e33'; g.fillRect(X(x0), Y(y1), X(x1 - x0), X(y1 - y0));
+    const n = Math.max(2, Math.round((x1 - x0) / 0.75));
+    const cw = (x1 - x0 - 0.06) / n;
+    for (let i = 0; i < n; i++) {
+      const gx = x0 + 0.06 + i * cw;
+      for (const [a, b] of [[y0 + 0.08, y0 + 0.9], [y0 + 0.98, y1 - 0.08]]) {
+        const grd = g.createLinearGradient(0, Y(b), 0, Y(a));
+        grd.addColorStop(0, '#a9bccb'); grd.addColorStop(1, '#6f8597');
+        g.fillStyle = curtains && ((i + Math.floor(y0)) % 3 === 0) && a > y0 + 0.5 ? '#e9e6df' : grd;
+        g.fillRect(X(gx), Y(b), X(cw - 0.06), X(b - a));
+      }
+    }
+  };
+  const win = (x0, x1, y0, y1) => {
+    g.fillStyle = '#2b2e33'; g.fillRect(X(x0) - 4, Y(y1) - 4, X(x1 - x0) + 8, X(y1 - y0) + 8);
+    const grd = g.createLinearGradient(0, Y(y1), 0, Y(y0));
+    grd.addColorStop(0, '#b8c8d4'); grd.addColorStop(1, '#5f7586');
+    g.fillStyle = grd; g.fillRect(X(x0), Y(y1), X(x1 - x0), X(y1 - y0));
+    g.fillStyle = '#2b2e33'; g.fillRect(X((x0 + x1) / 2) - 3, Y(y1), 6, X(y1 - y0));
+  };
+  for (let f = 0; f < floors; f++) {
+    const y0 = f * floorH + 0.25, y1 = y0 + floorH - 0.55;
+    glazing(Wm * 0.16, Wm * 0.58, y0, y1, true);
+    win(Wm * 0.03, Wm * 0.11, y0 + 0.9, y1 - 0.1);
+    win(Wm * 0.71, Wm * 0.77, y0 + 0.9, y1 - 0.1);
+    win(Wm * 0.8, Wm * 0.86, y0 + 0.9, y1 - 0.1);
+    glazing(Wm * 0.9, Wm * 0.995, y0, y1, false);
+    g.fillStyle = '#efeeea'; g.fillRect(0, Y(f * floorH + 0.12), W, 10);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+export function buildFacade(data) {
+  const F = data.facade;
+  if (!F) return null;
+  const root = new THREE.Group(), upper = new THREE.Group();
+  root.name = 'facade';
+  const y = F.y * M, x0 = F.x0 * M, x1 = F.x1 * M, cx = (x0 + x1) / 2, C = data.meta.ceiling * M;
+  // тротуар, бордюр, газон
+  const pav = pavingTexture(); pav.repeat.set((x1 - x0 + 8) / 1.0, 5.2 / 1.0);
+  const sw = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0 + 8, 5.2), new THREE.MeshLambertMaterial({ map: pav }));
+  sw.rotation.x = -Math.PI / 2; sw.position.set(cx, 0.002, y + 2.6); sw.receiveShadow = true;
+  root.add(sw);
+  root.add(boxAt(x1 - x0 + 8, 0.12, 0.15, mat('#b9b6ae'), cx, 0, y + 5.25, 0));
+  const lawn = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0 + 8, 6), mat('#7d7a52'));
+  lawn.rotation.x = -Math.PI / 2; lawn.position.set(cx, 0.004, y + 8.3); lawn.receiveShadow = true;
+  root.add(lawn);
+  // пилоны первого этажа
+  for (const [a, b, tone] of F.pylons) {
+    root.add(boxAt((b - a) * M + 0.04, C, 0.14, mat(tone === 'white' ? '#ecebe6' : '#45484d'), (a + b) / 2 * M, 0, y + 0.07, 0));
+  }
+  // соседние помещения первого этажа слева и справа
+  const [bx0, , bx1] = data.meta.bounds.map(v => v * M);
+  for (const [a, b] of [[x0 - 4, bx0], [bx1, x1 + 4]]) {
+    root.add(boxAt(b - a, C, 0.3, mat('#45484d'), (a + b) / 2, 0, y - 0.15, 0));
+    const gl = new THREE.Mesh(new THREE.PlaneGeometry((b - a) * 0.6, 2.6), darkGlass);
+    gl.position.set((a + b) / 2, 0.5 + 1.3, y + 0.005);
+    root.add(gl);
+  }
+  // водосточная труба
+  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, C, 10), mat('#f2f2f2'));
+  pipe.position.set(0.45, C / 2, y + 0.2); root.add(pipe);
+  // ограждение приямка перед «открытым фасадом» и потолок над ним
+  if (F.railing) {
+    const [a, b] = F.railing.map(v => v * M);
+    const rm = mat('#3a3d42');
+    root.add(boxAt(b - a, 0.04, 0.05, rm, (a + b) / 2, 1.0, y + 0.05, 0));
+    root.add(boxAt(b - a, 0.04, 0.05, rm, (a + b) / 2, 0.1, y + 0.05, 0));
+    const n = Math.floor((b - a) / 0.12);
+    const bar = new THREE.InstancedMesh(new THREE.BoxGeometry(0.02, 0.9, 0.02), rm, n);
+    const m4 = new THREE.Matrix4();
+    for (let i = 0; i < n; i++) { m4.makeTranslation(a + 0.06 + i * 0.12, 0.55, y + 0.05); bar.setMatrixAt(i, m4); }
+    root.add(bar);
+    const rec = data.windows.find(w => w.kind === 'window' && w.x0 * M <= a + 0.01 && w.x1 * M >= b - 0.01);
+    if (rec) root.add(boxAt(b - a, 0.08, y - rec.y * M, mat('#efeeea'), (a + b) / 2, C - 0.08, (y + rec.y * M) / 2, 0, false));
+  }
+  // вывеска над входом (нейтральная)
+  if (F.sign) {
+    const s = F.sign;
+    const box3 = boxAt((s.x1 - s.x0) * M, (s.y1 - s.y0) * M, 0.12, mat('#2b2e33'), (s.x0 + s.x1) / 2 * M, s.y0 * M, y + 0.06, 0);
+    root.add(box3);
+    const pl = signPlane(s.text, (s.x1 - s.x0) * M * 0.9, (s.y1 - s.y0) * M * 0.7, null, '#ffffff');
+    pl.position.set((s.x0 + s.x1) / 2 * M, (s.y0 + s.y1) / 2 * M, y + 0.125);
+    root.add(pl);
+  }
+  // белый пояс над первым этажом
+  const [b0, b1] = F.band.map(v => v * M);
+  root.add(boxAt(x1 - x0 + 8, b1 - b0, 0.5, mat('#f1f0ec'), cx, b0, y + 0.1, 0));
+  // этажи жилого дома (видны с улицы)
+  const Hm = F.floors * F.floorH * M, Wu = x1 - x0 + 8;
+  const tex = facadeTexture(Wu, Hm, F.floors, F.floorH * M);
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(Wu, Hm), new THREE.MeshLambertMaterial({ map: tex }));
+  wall.position.set(cx, b1 + Hm / 2, y + 0.02);
+  upper.add(wall);
+  const slab = mat('#efeeea');
+  for (let f = 1; f <= F.floors; f++) {
+    upper.add(boxAt(Wu * 0.44, 0.18, 0.35, slab, x0 - 4 + Wu * 0.37, b1 + f * F.floorH * M - 0.1, y + 0.17, 0, false));
+  }
+  const grill = mat('#55595e');
+  for (const [fx, f] of [[0.74, 0], [0.83, 1], [0.74, 2]]) {
+    upper.add(boxAt(0.9, 0.45, 0.4, grill, x0 - 4 + Wu * fx, b1 + f * F.floorH * M + 0.35, y + 0.22, 0, false));
+  }
+  root.add(upper);
+  return { root, upper, y };
 }

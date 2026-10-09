@@ -92,6 +92,59 @@ WINDOWS = [
 GLASS_PARTS = [  # стеклянная перегородка тамбура
     {"x0": 497, "x1": 1389, "y": 10320, "sill": 0, "h": 2600, "kind": "glass", "note": "Тамбур"},
 ]
+# Двери: на схеме проемы нарисованы поверх сплошных перегородок, поэтому проемы
+# вырезаются из стен здесь. a-b — проем по грани стены, hinge — петля,
+# swing — куда открывается полотно (по дуге на схеме), into — направление в толщу стены.
+DOORS = [
+    {"id": "d-evac", "a": [8878, 9256], "b": [9878, 9256], "hinge": [9878, 9256], "swing": [9878, 8256], "into": [0, 1], "t": 120,
+     "top": CEIL - 400, "kind": "fire", "label": "Служебный вход · эвакуационный выход", "w": 1000},
+    {"id": "d-kpp", "a": [8735, 9376], "b": [8735, 10176], "hinge": [8735, 9376], "swing": [7935, 9376], "into": [1, 0], "t": 120,
+     "top": CEIL, "kind": "service", "label": "КПП", "w": 800},
+    {"id": "d-wc", "a": [9244, 10446], "b": [9944, 10446], "hinge": [9244, 10446], "swing": [9244, 9746], "into": [0, 1], "t": 120,
+     "top": CEIL, "kind": "service", "label": "С/У", "w": 700},
+    {"id": "d-srv", "a": [10240, 10446], "b": [11040, 10446], "hinge": [10240, 10446], "swing": [10240, 9646], "into": [0, 1], "t": 120,
+     "top": CEIL, "kind": "service", "label": "Аппаратная", "w": 800},
+    {"id": "d-cash", "a": [11282, 10446], "b": [12182, 10446], "hinge": [12182, 10446], "swing": [12182, 9546], "into": [0, 1], "t": 120,
+     "top": CEIL, "kind": "service", "label": "Главная касса", "w": 900},
+    {"id": "d-tambour", "a": [1389, 10290], "b": [2807, 10290], "into": [0, 1], "t": 60, "top": 2600, "kind": "glass2",
+     "out": [0, 1], "label": "", "w": 1418, "transom": True},
+    {"id": "d-main", "a": [1150, 12030], "b": [2650, 12030], "into": [0, 1], "t": 60, "top": 3610, "kind": "glass2",
+     "out": [0, 1], "label": "", "w": 1500, "transom": False},
+]
+
+def cut_doors(wl):
+    cuts = []
+    for d in DOORS:
+        if d["kind"] == "glass2": continue
+        (ax, ay), (bx, by) = d["a"], d["b"]
+        nx, ny = d["into"]
+        if ay == by:
+            cuts.append(box(min(ax, bx), ay - 40 + min(0, ny) * d["t"], max(ax, bx), ay + 40 + max(0, ny) * d["t"]))
+        else:
+            cuts.append(box(ax - 40 + min(0, nx) * d["t"], min(ay, by), ax + 40 + max(0, nx) * d["t"], max(ay, by)))
+    cut = unary_union(cuts)
+    out = []
+    for w in wl:
+        pg = Polygon(w["pts"], w["holes"]).buffer(0)
+        if not pg.intersects(cut):
+            out.append(w); continue
+        rest = pg.difference(cut)
+        for g in getattr(rest, "geoms", [rest]):
+            if g.area < 5000: continue
+            q = dict(w); q["pts"] = ring(g.exterior); q["holes"] = [ring(i) for i in g.interiors]
+            out.append(q)
+    return out
+
+# Фасад со стороны входа (по фото на листе 1): белые пилоны, графитовые панели,
+# белый пояс над первым этажом, остекленные лоджии выше.
+FACADE = {
+    "y": 12101, "x0": -600, "x1": 14080,
+    "pylons": [[0, 502, "white"], [2807, 3841, "white"], [6695, 7322, "white"], [9721, 10552, "dark"], [12935, 13484, "dark"]],
+    "railing": [3841, 6695],
+    "band": [4400, 4900], "floors": 3, "floorH": 3000,
+    "sign": {"x0": 900, "x1": 2900, "y0": 3700, "y1": 4250, "text": "ПРОДУКТЫ"},
+}
+
 LINTELS = [  # перемычки над проемами (H проема 2100 по схеме)
     {"x0": 6960, "x1": 7100, "y0": 3800, "y1": 4900, "y0h": 2100},
 ]
@@ -443,13 +496,14 @@ def main(pdf):
     doc = pymupdf.open(pdf)
     page = doc[0]
     wl, allw = walls(page)
+    wl = cut_doors(wl)
     fl = floor_poly(allw)
     b = allw.bounds
     data = {
         "meta": {"name": "Магазин №1", "ceiling": CEIL, "bounds": [round(v) for v in b],
                  "source": "Технологическая схема, лист 1 и обмерная схема, лист 3; масштаб 15,678 мм/пт",
                  "floorArea": fl["area_inner_m2"]},
-        "walls": wl, "floor": fl["pts"], "windows": WINDOWS + GLASS_PARTS, "lintels": LINTELS,
+        "walls": wl, "floor": fl["pts"], "windows": WINDOWS + GLASS_PARTS, "lintels": LINTELS, "doors": DOORS, "facade": FACADE,
         "beams": [{"b": bb, "y0": CEIL - 600} for bb in beams(page)],  # глубина ригеля на схеме не указана
         "labels": LABELS, "decals": DECALS, "routes": ROUTES,
         "items": [build_item(i) for i in ITEMS], "templates": TEMPLATES,
