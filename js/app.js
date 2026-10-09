@@ -597,10 +597,12 @@ document.querySelectorAll('#walkpad button').forEach(b => {
   b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
 });
 const FY = data.facade ? data.facade.y : Infinity;
-function onStreet(x, y) { return y > FY + 150 && y < FY + 5000 && x > -2500 && x < 16000; }
+// Тротуар: за линией фасада можно ходить; у самого фасада мешают только стены и стекло
 function walkBlocked(x, y) {
-  if (onStreet(x, y)) return false;
-  if (raster.isWall(x, y) || !raster.isInside(x, y)) return true;
+  if (x < -2500 || x > 16000 || y > FY + 5000) return true;
+  if (y > FY + 150) return false;
+  if (raster.isWall(x, y)) return true;
+  if (y < FY - 200 && !raster.isInside(x, y)) return true;
   for (const o of objs.values()) {
     if (Math.abs(o.it.x - x) > (o.it.w + o.it.d) || Math.abs(o.it.y - y) > (o.it.w + o.it.d)) continue;
     for (const r of partRects(o.it)) if (r.y0 < 1500 && Math.abs(r.cx - x) < r.hw + r.hd + 250 && Math.abs(r.cy - y) < r.hw + r.hd + 250) {
@@ -904,4 +906,4 @@ resize();
 $('#loading').remove();
 if (!store.get('store3d.seenHelp', false)) { store.set('store3d.seenHelp', true); setTimeout(help, 300); }
 frame();
-window.__app = { walkTo: (x, y, yaw, pitch = 0) => { setMode('walk'); Object.assign(walk, { x, y, yaw, pitch, init: true }); }, info: () => renderer.info.render, screenOf: id => { const o = objs.get(id); const v = new THREE.Vector3(o.it.x * M, 0.3, o.it.y * M).project(camera); const r = renderer.domElement.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; }, objs, snapshot, runChecks: () => (runChecks(), lastChecks), setMode, select, data };
+window.__app = { orbitTo: (px, py, pz, tx, ty, tz) => { setMode("orbit"); orbit.target.set(tx, ty, tz); persp.position.set(px, py, pz); orbit.update(); }, lowWalls: on => setLowWalls(on), walk, walkTo: (x, y, yaw, pitch = 0) => { setMode('walk'); Object.assign(walk, { x, y, yaw, pitch, init: true }); }, info: () => renderer.info.render, screenOf: id => { const o = objs.get(id); const v = new THREE.Vector3(o.it.x * M, 0.3, o.it.y * M).project(camera); const r = renderer.domElement.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; }, objs, snapshot, runChecks: () => (runChecks(), lastChecks), setMode, select, data };

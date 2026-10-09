@@ -876,3 +876,190 @@ export function buildFacade(data) {
   root.add(upper);
   return { root, upper, y };
 }
+
+// ---------------------------------------------------------------- детализированные модели (лицевая сторона +Z)
+const steel = () => mat('#c9ced4');
+const black = () => mat('#1e2024');
+function cylY(rt, rb, h, material, x, y0, z, seg = 16) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), material);
+  m.position.set(x, y0 + h / 2, z); m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function latheY(pts, material, x, y0, z, seg = 16) {
+  const m = new THREE.Mesh(new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg), material);
+  m.position.set(x, y0, z); m.castShadow = true;
+  return m;
+}
+const screenMat = new THREE.MeshPhongMaterial({ color: 0x1b2836, emissive: 0x16324f, shininess: 80, specular: 0x8899aa });
+
+// Унитаз: чаша, сиденье, крышка, бачок с кнопкой
+B.toilet = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const w = new THREE.MeshPhongMaterial({ color: 0xfbfbfb, shininess: 60, specular: 0x666666 });
+  const L = Math.min(D, 0.68), bz = -D / 2 + 0.12 + 0.2;
+  const ped = cylY(0.13, 0.11, 0.3, w, 0, 0, bz + 0.05); ped.scale.z = 1.5; g.add(ped);
+  const bowl = latheY([[0.11, 0], [0.17, 0.06], [0.19, 0.1], [0.18, 0.11], [0.12, 0.08], [0, 0.03]], w, 0, 0.3, bz + 0.07, 20);
+  bowl.scale.z = 1.35; g.add(bowl);
+  const seat = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.025, 8, 24), w);
+  seat.rotation.x = Math.PI / 2; seat.scale.y = 1.35; seat.position.set(0, 0.42, bz + 0.07); g.add(seat);
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.02, 24), w);
+  lid.scale.z = 1.3; lid.rotation.x = -1.25; lid.position.set(0, 0.62, -D / 2 + 0.2); g.add(lid);
+  g.add(box(0.4, 0.38, 0.17, w, 0, 0.42, -D / 2 + 0.085));
+  g.add(box(0.42, 0.03, 0.19, w, 0, 0.8, -D / 2 + 0.095));
+  g.add(cylY(0.03, 0.03, 0.012, mat('#c0c4c8'), 0, 0.83, -D / 2 + 0.09));
+  return g;
+};
+// Раковина на стене: чаша, смеситель, пьедестал, зеркало
+B.sink = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const w = new THREE.MeshPhongMaterial({ color: 0xfbfbfb, shininess: 60, specular: 0x666666 });
+  const bw = Math.min(W, 0.5), bd = Math.min(D, 0.42), top = 0.85;
+  g.add(box(bw, 0.16, bd, w, 0, top - 0.16, -D / 2 + bd / 2));
+  g.add(box(bw - 0.08, 0.012, bd - 0.1, mat('#d9dee3'), 0, top - 0.005, -D / 2 + bd / 2 + 0.02, false));
+  g.add(cylY(0.07, 0.09, top - 0.16, w, 0, 0, -D / 2 + 0.12));
+  g.add(cylY(0.018, 0.022, 0.16, steel(), 0, top, -D / 2 + 0.05));
+  g.add(box(0.025, 0.025, 0.12, steel(), 0, top + 0.13, -D / 2 + 0.11, false));
+  const mir = new THREE.Mesh(new THREE.PlaneGeometry(bw, 0.7), new THREE.MeshPhongMaterial({ color: 0xcfe3ee, shininess: 120, specular: 0xffffff }));
+  mir.position.set(0, top + 0.25 + 0.35, -D / 2 + 0.006); g.add(mir);
+  g.add(box(bw + 0.04, 0.7 + 0.04, 0.008, mat('#8d9399'), 0, top + 0.23, -D / 2 + 0.002, false));
+  return g;
+};
+// Кофемашина: корпус, панель, группы, поддон, бункер для зерна, чашки
+B.coffee = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const bw = Math.min(W, 0.75), bd = Math.min(D, 0.55), bh = Math.min(H, 0.55);
+  g.add(box(bw, bh, bd, mat('#2c2e31'), 0, 0, -0.05));
+  g.add(box(bw * 0.96, bh * 0.35, 0.02, steel(), 0, bh * 0.55, bd / 2 - 0.05));
+  const scr = box(0.16, 0.09, 0.01, screenMat, 0, bh * 0.68, bd / 2 - 0.035, false); g.add(scr);
+  for (const x of [-bw * 0.25, bw * 0.25]) {
+    g.add(cylY(0.035, 0.035, 0.06, steel(), x, bh * 0.4, bd / 2 - 0.08));
+    g.add(cylY(0.035, 0.03, 0.07, mat('#f4f1ea'), x, 0.04, bd / 2 - 0.06));
+  }
+  g.add(box(bw * 0.9, 0.03, 0.12, steel(), 0, 0.01, bd / 2 - 0.04));
+  const hop = cylY(0.07, 0.05, 0.16, new THREE.MeshPhongMaterial({ color: 0x6b4423, transparent: true, opacity: 0.7 }), bw * 0.3, bh, -0.08);
+  g.add(hop);
+  for (let i = 0; i < 3; i++) g.add(cylY(0.04, 0.035, 0.05, mat('#f4f1ea'), -bw * 0.28 + i * 0.09, bh, -0.08));
+  return g;
+};
+// Сиропы, стаканы и крышки на стойке рядом с кофемашиной
+B.syrups = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const cols = ['#7b1f1f', '#c98a2b', '#3e2723', '#e8c46b', '#8e2a5a', '#2e7d32', '#f1e3c6', '#b23a2a'];
+  const n = Math.max(3, Math.floor((W - 0.05) / 0.075));
+  for (let i = 0; i < n; i++) {
+    const x = -W / 2 + 0.05 + i * (W - 0.1) / (n - 1);
+    const z = -D / 2 + 0.1;
+    g.add(latheY([[0.03, 0], [0.032, 0.22], [0.016, 0.26], [0.011, 0.29], [0, 0.29]],
+      new THREE.MeshPhongMaterial({ color: cols[i % cols.length], shininess: 70 }), x, 0, z, 10));
+    g.add(cylY(0.012, 0.012, 0.05, black(), x, 0.29, z, 8));
+    g.add(box(0.06, 0.012, 0.012, black(), x + 0.025, 0.335, z, false));
+  }
+  // стопки стаканов и крышек
+  for (const [x, c] of [[-W * 0.25, '#f4f1ea'], [0, '#5d4037'], [W * 0.25, '#f4f1ea']]) {
+    for (let k = 0; k < 8; k++) g.add(cylY(0.045, 0.035, 0.02, mat(c), x, k * 0.018, D / 2 - 0.08, 12));
+  }
+  return g;
+};
+// Касса с лентопротягом: тумба, рама из нержавейки, лента, ограничители
+B.belt = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const long = W >= D, L = long ? W : D, S = long ? D : W;
+  const along = (len, h, wid, material, o, y0, s = 0, shadow = true) =>
+    long ? box(len, h, wid, material, o, y0, s, shadow) : box(wid, h, len, material, s, y0, o, shadow);
+  g.add(along(L, H - 0.06, S, mat(p.color || '#e9d8b8'), 0, 0));
+  g.add(along(L, 0.04, S + 0.02, steel(), 0, H - 0.06));
+  const bw = Math.min(S - 0.12, 0.5);
+  g.add(along(L - 0.16, 0.02, bw, mat('#1b1b1b'), 0, H - 0.02, 0, false));
+  for (const e of [-1, 1]) {
+    const r = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, bw, 12), steel());
+    if (long) { r.rotation.x = Math.PI / 2; r.position.set(e * (L / 2 - 0.08), H - 0.01, 0); }
+    else { r.rotation.z = Math.PI / 2; r.position.set(0, H - 0.01, e * (L / 2 - 0.08)); }
+    g.add(r);
+  }
+  for (const s of [-1, 1]) g.add(along(L - 0.1, 0.05, 0.03, steel(), 0, H, s * (bw / 2 + 0.03)));
+  // разделитель покупок
+  g.add(along(0.4, 0.04, 0.05, mat('#2f6fd6'), L * 0.15, H, 0, false));
+  return g;
+};
+// Рабочее место кассира: стол, сканер, монитор кассира, дисплей покупателя, терминал, принтер
+B.checkout = (W, D, H, p) => {
+  const g = new THREE.Group();
+  g.add(box(W, H - 0.04, D, mat(p.color || '#e9d8b8')));
+  g.add(box(W + 0.02, 0.04, D + 0.02, mat('#4a4d52'), 0, H - 0.04, 0));
+  // сканер в столешнице
+  g.add(box(0.32, 0.006, 0.26, mat('#1f3a2a'), -W / 2 + 0.3, H, 0.0, false));
+  g.add(box(0.32, 0.18, 0.06, mat('#2b2e33'), -W / 2 + 0.3, H, -0.16));
+  // монитор кассира на стойке (смотрит назад, на кассира)
+  g.add(box(0.05, 0.3, 0.05, mat('#2b2e33'), -W / 2 + 0.75, H, -D / 2 + 0.2));
+  const mon = box(0.4, 0.28, 0.04, mat('#2b2e33'), -W / 2 + 0.75, H + 0.3, -D / 2 + 0.2);
+  g.add(mon);
+  const ms = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.24), screenMat);
+  ms.rotation.y = Math.PI; ms.position.set(-W / 2 + 0.75, H + 0.44, -D / 2 + 0.177); g.add(ms);
+  // дисплей покупателя (лицом к покупателю)
+  const cd = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.12), screenMat);
+  cd.position.set(-W / 2 + 0.75, H + 0.5, -D / 2 + 0.224); g.add(cd);
+  // платежный терминал на краю, принтер чеков, денежный ящик
+  g.add(box(0.08, 0.04, 0.16, black(), -W / 2 + 1.05, H, D / 2 - 0.12));
+  g.add(box(0.07, 0.02, 0.05, screenMat, -W / 2 + 1.05, H + 0.04, D / 2 - 0.08, false));
+  g.add(box(0.16, 0.14, 0.2, mat('#3a3d42'), -W / 2 + 1.25, H, -D / 2 + 0.15));
+  g.add(box(0.42, 0.12, 0.42, mat('#2b2e33'), -W / 2 + 0.75, H - 0.2, -D / 2 + 0.215));
+  return g;
+};
+// КСО: тумба, сканер, весовая площадка для пакетов, сенсорный экран, терминал, маячок
+B.kiosk = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const bw = Math.min(W, 0.55), bd = Math.min(D, 0.5);
+  const body = mat('#eceef1');
+  g.add(box(bw, 0.86, bd, body, 0, 0, -0.05));
+  g.add(box(bw + 0.04, 0.03, bd + 0.08, mat('#3a3d42'), 0, 0.86, -0.03));
+  g.add(box(0.3, 0.005, 0.22, mat('#1f3a2a'), 0, 0.89, 0.03, false));
+  // площадка для пакетов сбоку
+  const side = Math.min(0.35, (W - bw) / 2 - 0.02);
+  if (side > 0.15) {
+    g.add(box(side, 0.78, bd, body, bw / 2 + side / 2 + 0.02, 0, -0.05));
+    g.add(box(side, 0.02, bd, steel(), bw / 2 + side / 2 + 0.02, 0.78, -0.05));
+    for (const s of [-1, 1]) g.add(box(0.02, 0.3, 0.02, steel(), bw / 2 + side / 2 + 0.02 + s * side * 0.4, 0.8, -0.05 - bd * 0.4));
+  }
+  // экран на колонне
+  g.add(box(0.12, 0.45, 0.1, body, 0, 0.89, -bd / 2 + 0.02));
+  const frame = box(0.42, 0.62, 0.05, mat('#2b2e33'), 0, 0, 0);
+  const sc = new THREE.Group();
+  sc.add(frame);
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.37, 0.56), screenMat); scr.position.set(0, 0.31, 0.027); sc.add(scr);
+  sc.position.set(0, 1.25, -bd / 2 + 0.08); sc.rotation.x = -0.18;
+  g.add(sc);
+  g.add(box(0.08, 0.14, 0.05, black(), bw / 2 - 0.06, 0.95, bd / 2 - 0.12));
+  // маячок с номером
+  g.add(cylY(0.015, 0.015, Math.max(0.2, H - 1.95), steel(), -0.18, 1.85, -bd / 2 + 0.05, 8));
+  g.add(cylY(0.05, 0.05, 0.12, new THREE.MeshPhongMaterial({ color: 0x2ecc71, emissive: 0x145c32 }), -0.18, Math.max(2.05, H - 0.1), -bd / 2 + 0.05));
+  return g;
+};
+// Складской стеллаж с коробками
+B.storage = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const post = mat('#3d5a80'), beam = mat('#e07a1f');
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(box(0.04, H, 0.04, post, sx * (W / 2 - 0.02), 0, sz * (D / 2 - 0.02)));
+  const n = 4, gap = (H - 0.15) / n;
+  const st = stockFor({ label: 'storage' }, W);
+  for (let i = 0; i < n; i++) {
+    const y = 0.12 + i * gap;
+    g.add(box(W, 0.03, D, mat('#c9ced4'), 0, y, 0, false));
+    for (const sz of [-1, 1]) g.add(box(W, 0.06, 0.03, beam, 0, y - 0.03, sz * (D / 2 - 0.015), false));
+    st.shelf('carton', -W / 2 + 0.03, W / 2 - 0.03, y + 0.03, D / 2 - 0.02, -D / 2 + 0.02, gap - 0.06, { rows: 3 });
+  }
+  addStock(g, st);
+  return g;
+};
+// Моноблок с клавиатурой и мышью
+B.monoblock = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const sw = Math.min(W, 0.6), sh = Math.min(H, 0.45) * 0.78;
+  g.add(box(0.2, 0.012, 0.16, mat('#c9ced4'), 0, 0, -D / 2 + 0.1));
+  g.add(box(0.05, H - sh - 0.02, 0.03, mat('#c9ced4'), 0, 0, -D / 2 + 0.12));
+  g.add(box(sw, sh, 0.03, mat('#2b2e33'), 0, H - sh, -D / 2 + 0.1));
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(sw - 0.03, sh - 0.05), screenMat);
+  scr.position.set(0, H - sh / 2 + 0.01, -D / 2 + 0.116); g.add(scr);
+  g.add(box(0.42, 0.015, 0.13, mat('#e9ebee'), -0.05, 0, D / 2 - 0.1, false));
+  g.add(box(0.06, 0.02, 0.1, mat('#e9ebee'), 0.24, 0, D / 2 - 0.1, false));
+  return g;
+};
