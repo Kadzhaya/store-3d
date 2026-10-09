@@ -95,6 +95,8 @@ const GEO_DEF = {
   'salad.lid': () => bx(.132, .012, .102, .05),
   'cig.body': () => bx(.055, .088, .022),
   'gum.body': () => bx(.075, .1, .02),
+  'fish.body': () => bx(.12, .18, .03),
+  'fish.win': () => bx(.07, .07, .032, .06),
   'bar.body': () => bx(.03, .14, .022),
   'carton.body': () => bx(.2, .16, .14),
   'apple': () => sph(.038), 'orange': () => sph(.041), 'lemon': () => sph(.032, 1.3, 1, 1),
@@ -201,6 +203,7 @@ const A = {
   cake: { w: .205, d: .205, h: .085, stack: 2, c: [['cake.body', P.cake], ['cake.top', P.cakeTop]] },
   salad: { w: .135, d: .105, h: .062, stack: 3, c: [['salad.body', P.salad], ['salad.lid', '#e8f4fb']] },
   cig: { w: .058, d: .024, h: .09, stack: 2, c: [['cig.body', P.cig]] },
+  fishsnack: { w: .125, d: .035, h: .18, c: [['fish.body', ['#1565c0', '#0d47a1', '#c62828', '#fdd835']], ['fish.win', ['#d7a86e', '#c98a4b', '#e0b07a']]] },
   gum: { w: .08, d: .024, h: .1, c: [['gum.body', ['#43a047', '#1e88e5', '#e53935', '#fdd835', '#ffffff', '#8e24aa']]] },
   bar: { w: .034, d: .026, h: .14, c: [['bar.body', ['#5d4037', '#c62828', '#1565c0', '#fdd835', '#2e7d32', '#212121']]] },
   carton: { w: .205, d: .145, h: .16, stack: 2, c: [['carton.body', ['#c8a165', '#d7b98e', '#bcaaa4']]] },
@@ -239,6 +242,7 @@ const CAT = {
   'ОИФ горка': ['salad'], 'Соленья': ['jar'], 'FTG (готовая еда)': ['salad'], 'Торты и пирожные': ['cake'],
   'ОИФ + ПФ замороженные': ['frozen'], 'Рыба замороженная': ['frozen'], 'Мороженое': ['icecup', 'icebox'],
   'Сезонный товар': ['candybox', 'cookies'],
+  'Снеки к пиву': ['chips', 'nuts', 'fishsnack'],
 };
 const KEYWORDS = [
   [/алког|водк/i, ['vodka', 'whisky']], [/табак/i, ['cig']], [/пепси|кола|балтик|импорт|drinks/i, ['soda', 'energy']],

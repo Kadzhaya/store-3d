@@ -385,10 +385,88 @@ B.panel = (W, D, H, p) => {
   }
   return g;
 };
+// Стопка пластиковых корзин на подставке: сужающиеся ящики с решеткой и ручками
 B.baskets = (W, D, H, p) => {
   const g = new THREE.Group();
-  const c = mat(p.color || '#d33');
-  for (let i = 0; i < 6; i++) g.add(box(W * 0.9, 0.08, D * 0.9, c, 0, i * 0.09, 0));
+  const col = p.color || '#d32f2f';
+  const pl = new THREE.MeshLambertMaterial({ color: col, side: THREE.DoubleSide });
+  const bw = Math.min(W, 0.46), bd = Math.min(D, 0.33), bh = 0.22;
+  // подставка с табличкой «Корзины»
+  g.add(box(bw + 0.06, 0.04, bd + 0.06, mat('#3a3d42'), 0, 0.04, 0));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(cylY(0.018, 0.018, 0.04, mat('#222'), sx * bw / 2, 0, sz * bd / 2, 8));
+  const tub = new THREE.CylinderGeometry(1, 0.82, 1, 4, 1, true);
+  tub.rotateY(Math.PI / 4);
+  const n = Math.max(3, Math.floor((H - 0.1 - bh) / 0.06) + 1);
+  for (let i = 0; i < n; i++) {
+    const y = 0.08 + i * 0.06;
+    const m = new THREE.Mesh(tub, pl);
+    m.scale.set(bw / Math.SQRT2, bh, bd / Math.SQRT2);
+    m.position.set(0, y + bh / 2, 0);
+    m.castShadow = true;
+    g.add(m);
+    // ободок
+    g.add(box(bw + 0.01, 0.015, 0.015, pl, 0, y + bh - 0.015, bd / 2), box(bw + 0.01, 0.015, 0.015, pl, 0, y + bh - 0.015, -bd / 2));
+  }
+  const top = 0.08 + (n - 1) * 0.06;
+  g.add(box(bw * 0.8, 0.01, bd * 0.8, pl, 0, top + 0.002, 0, false));
+  // решетка на стенках верхней корзины
+  for (let k = 1; k < 6; k++) {
+    const x = -bw / 2 + k * bw / 6;
+    g.add(box(0.012, bh * 0.7, 0.004, mat('#7f1d1d'), x, top + bh * 0.15, bd / 2 + 0.004, false));
+  }
+  // ручки верхней корзины, сложены вдоль длинных сторон
+  for (const s of [-1, 1]) {
+    const h = new THREE.Mesh(new THREE.TorusGeometry(bw * 0.3, 0.008, 6, 16, Math.PI), mat('#212121'));
+    h.rotation.x = -Math.PI / 2 + s * 0.35;
+    h.position.set(0, top + bh, s * bd * 0.42);
+    g.add(h);
+  }
+  return g;
+};
+// Уголок покупателя: стенд с карманами А4, документами и книгой отзывов
+const docTexCache = new Map();
+function docTexture(title) {
+  if (docTexCache.has(title)) return docTexCache.get(title);
+  const c = document.createElement('canvas'); c.width = 210; c.height = 297;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 210, 297);
+  g.fillStyle = '#1d2330'; g.font = '700 17px system-ui, Arial, sans-serif'; g.textAlign = 'center';
+  const words = title.split(' '); let line = '', y = 38;
+  for (const w of words) { if (g.measureText(line + w).width > 180) { g.fillText(line, 105, y); y += 20; line = ''; } line += w + ' '; }
+  g.fillText(line, 105, y);
+  g.fillStyle = '#9aa3ad';
+  for (let k = 0; k < 11; k++) g.fillRect(22, y + 26 + k * 17, 166 - (k % 3) * 22, 5);
+  g.strokeStyle = '#1e5bd8'; g.lineWidth = 3; g.beginPath(); g.arc(160, 262, 20, 0, Math.PI * 2); g.stroke();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  docTexCache.set(title, t);
+  return t;
+}
+B.infoboard = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const col = p.color || '#1e5bd8';
+  g.add(box(W, H, 0.02, mat('#f4f6fa'), 0, 0, -D / 2 + 0.01));
+  g.add(box(W + 0.03, 0.03, 0.03, mat(col), 0, -0.015, -D / 2 + 0.015), box(W + 0.03, 0.03, 0.03, mat(col), 0, H - 0.015, -D / 2 + 0.015));
+  for (const s of [-1, 1]) g.add(box(0.03, H, 0.03, mat(col), s * (W / 2), 0, -D / 2 + 0.015));
+  const hd = signPlane('Уголок покупателя', W - 0.06, 0.12, col, '#ffffff');
+  hd.position.set(0, H - 0.1, -D / 2 + 0.022); g.add(hd);
+  const docs = ['Лицензия на розничную продажу алкоголя', 'Свидетельство ОГРН и ИНН', 'Правила продажи товаров', 'Закон о защите прав потребителей',
+    'Режим работы магазина', 'Сертификаты и декларации', 'Контакты Роспотребнадзора', 'Информация о продавце'];
+  const cols = Math.max(2, Math.floor((W - 0.04) / 0.23)), rows = 2;
+  const aw = 0.18, ah = 0.255;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const k = r * cols + c;
+    if (k >= docs.length) continue;
+    const x = -W / 2 + (c + 0.5) * W / cols, y = H - 0.25 - r * (ah + 0.05) - ah / 2;
+    const doc = new THREE.Mesh(new THREE.PlaneGeometry(aw, ah), new THREE.MeshBasicMaterial({ map: docTexture(docs[k]) }));
+    doc.position.set(x, y, -D / 2 + 0.024); g.add(doc);
+    const pocket = new THREE.Mesh(new THREE.PlaneGeometry(aw + 0.02, ah + 0.02), glassMat);
+    pocket.position.set(x, y, -D / 2 + 0.03); g.add(pocket);
+  }
+  // книга отзывов и предложений в кармане внизу
+  g.add(box(0.17, 0.22, 0.035, mat('#8d1f2d'), -W / 4, 0.03, -D / 2 + 0.04));
+  const bk = signPlane('Книга отзывов', 0.15, 0.045, '#8d1f2d', '#f5e6c8');
+  bk.position.set(-W / 4, 0.2, -D / 2 + 0.058); g.add(bk);
+  g.add(box(0.24, 0.18, 0.05, glassMat, W / 4, 0.03, -D / 2 + 0.04, false));
   return g;
 };
 B.tobacco = (W, D, H, p) => {
