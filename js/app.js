@@ -542,6 +542,7 @@ function setMode(m) {
   $('#walkpad').hidden = m !== 'walk';
   $('#hud').innerHTML = HUD[m];
   building.beams.visible = m !== 'plan' && !lowWalls;
+  sun.castShadow = m !== 'plan';
   if (m === 'walk') {
     if (!walk.init) { walk.x = 1900; walk.y = 9700; walk.yaw = 0; walk.pitch = 0; walk.init = true; }
     walk.lowWallsWas = lowWalls; if (lowWalls) setLowWalls(false);
