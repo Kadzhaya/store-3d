@@ -1434,3 +1434,27 @@ B.tableclutter = (W, D, H, p) => {
   g.add(cylY(0.017, 0.017, 0.02, mat('#1565c0'), W * 0.38, 0.23, D * 0.3, 10));
   return g;
 };
+
+// Солонка, перечница, салфетница с салфетками, сахарница, зубочистки
+B.condiments = (W, D, H, p) => {
+  const g = new THREE.Group();
+  const glass = new THREE.MeshPhongMaterial({ color: 0xe8f1f5, shininess: 90, transparent: true, opacity: 0.85 });
+  const shaker = (x, z, cap) => {
+    g.add(latheY([[0.022, 0], [0.024, 0.07], [0.02, 0.085], [0, 0.085]], glass, x, 0, z, 14));
+    g.add(cylY(0.02, 0.021, 0.022, mat(cap), x, 0.083, z, 14));
+  };
+  shaker(-0.035, D * 0.15, '#c0c4c8');
+  shaker(0.035, D * 0.15, '#2b2e33');
+  // салфетница с салфетками
+  const nx = W * 0.2, nz = -D * 0.15;
+  g.add(box(0.15, 0.015, 0.07, mat('#c0c4c8'), nx, 0, nz));
+  for (const s of [-1, 1]) g.add(box(0.14, 0.09, 0.006, mat('#c0c4c8'), nx, 0.015, nz + s * 0.032, false));
+  g.add(box(0.13, 0.11, 0.05, mat('#ffffff'), nx, 0.015, nz, false));
+  // сахарница с крышкой
+  g.add(latheY([[0.04, 0], [0.05, 0.05], [0.045, 0.08], [0, 0.08]], new THREE.MeshPhongMaterial({ color: 0xfafafa, shininess: 60 }), -W * 0.25, 0, -D * 0.2, 16));
+  g.add(cylY(0.012, 0.012, 0.02, mat('#fafafa'), -W * 0.25, 0.08, -D * 0.2, 10));
+  // стаканчик с зубочистками
+  g.add(cylY(0.018, 0.018, 0.06, mat('#8d6e63'), W * 0.3, 0, D * 0.3, 10));
+  for (let i = 0; i < 6; i++) g.add(cylY(0.0015, 0.0015, 0.065, mat('#e8d3b0'), W * 0.3 + (i % 3 - 1) * 0.008, 0.02, D * 0.3 + (i < 3 ? -0.005 : 0.005), 4));
+  return g;
+};
