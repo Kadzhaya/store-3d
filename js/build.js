@@ -1,6 +1,7 @@
 // Построение 3D-геометрии: стены, окна, оборудование.
 // Единицы сцены — метры; данные — миллиметры.
 import * as THREE from 'three';
+import { Stock, goodsPlan, PRODUCE } from './goods.js';
 
 export const M = 0.001;
 
@@ -124,6 +125,12 @@ function contrastText(hex) {
 
 // ---------------------------------------------------------------- строители (лицевая сторона +Z, низ в 0)
 const B = {};
+function stockFor(p, W) { return new Stock(hash(`${p.sign || ''}|${p.label || ''}|${(p.cats || []).join()}|${W.toFixed(2)}`)); }
+function addStock(g, st) {
+  const m = st.build();
+  m.traverse(o => { if (o.isInstancedMesh) o.raycast = () => {}; }); // выбор объекта идет по корпусу
+  g.add(m);
+}
 
 B.shelf = (W, D, H, p) => {
   const g = new THREE.Group();
@@ -135,12 +142,13 @@ B.shelf = (W, D, H, p) => {
   g.add(box(0.03, H, D, frame, W / 2 - 0.015, 0, 0));
   const n = H > 2000 ? 6 : H > 1700 ? 5 : H > 1300 ? 4 : 3;
   const gap = (H - 0.16) / n;
-  const pm = prodMat(hash(p.sign || p.label || col), W, /вод|пив|вин|алк|лимон|сок|напит|drinks/i.test((p.sign || '') + (p.label || '')) ? 'bottle' : 'pack');
+  const st = stockFor(p, W), plan = goodsPlan(p, n);
   for (let i = 0; i < n; i++) {
     const y = 0.1 + i * gap;
     g.add(box(W - 0.06, 0.02, D - 0.06, mat('#eceff3'), 0, y, 0.01, false));
-    g.add(box(W - 0.08, gap * 0.62, (D - 0.1) * 0.8, pm, 0, y + 0.02, -0.01));
+    st.shelf(plan[i], -W / 2 + 0.035, W / 2 - 0.035, y + 0.02, D / 2 - 0.03, -D / 2 + 0.05, gap - 0.04, { rows: 3 });
   }
+  addStock(g, st);
   if (p.sign) {
     const s = signPlane(p.sign, W - 0.02, 0.16, col, contrastText(col));
     s.position.set(0, H + 0.1, D / 2 - 0.04);
@@ -160,12 +168,13 @@ B.cold = (W, D, H, p) => {
   g.add(box(0.05, H, D, shell, W / 2 - 0.025, 0, 0));
   g.add(box(W, 0.24, D, mat(col), 0, H - 0.24, 0));
   const n = 4, top = H - 0.32, bot = 0.32, gap = (top - bot) / n;
-  const pm = prodMat(hash(p.sign || col), W, 'pack');
+  const st = stockFor(p, W), plan = goodsPlan(p, n);
   for (let i = 0; i < n; i++) {
     const y = bot + i * gap;
     g.add(box(W - 0.1, 0.02, D - 0.16, mat('#f4f6f8'), 0, y, -0.03, false));
-    g.add(box(W - 0.12, gap * 0.55, (D - 0.2) * 0.75, pm, 0, y + 0.02, -0.05));
+    st.shelf(plan[i], -W / 2 + 0.06, W / 2 - 0.06, y + 0.02, D / 2 - 0.12, -D / 2 + 0.1, gap - 0.05, { rows: 3 });
   }
+  addStock(g, st);
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.1, H - 0.52), glassMat);
   glass.position.set(0, 0.28 + (H - 0.52) / 2, D / 2 - 0.01);
   g.add(glass);
@@ -194,12 +203,13 @@ B.fridge = (W, D, H, p) => {
   g.add(box(W, topH, D, body, 0, H - topH, 0));
   const n = Math.max(2, Math.round((H - 0.4) / 0.33));
   const gap = (H - topH - 0.18) / n;
-  const pm = prodMat(hash(p.sign || col) + 3, W, 'bottle');
+  const st = stockFor(p, W), plan = goodsPlan(p, n);
   for (let i = 0; i < n; i++) {
     const y = 0.14 + i * gap;
     g.add(box(W - 0.1, 0.015, D - 0.12, mat('#eef1f4'), 0, y, -0.02, false));
-    g.add(box(W - 0.12, gap * 0.7, (D - 0.16) * 0.8, pm, 0, y + 0.015, -0.03));
+    st.shelf(plan[i], -W / 2 + 0.06, W / 2 - 0.06, y + 0.015, D / 2 - 0.05, -D / 2 + 0.08, gap - 0.03, { rows: 4 });
   }
+  addStock(g, st);
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.08, H - topH - 0.14), glassMat);
   glass.position.set(0, 0.12 + (H - topH - 0.14) / 2, D / 2 - 0.005);
   g.add(glass);
@@ -222,7 +232,12 @@ B.chest = (W, D, H, p) => {
   g.add(box(t, H - 0.12, D, wall, -W / 2 + t / 2, 0.12, 0));
   g.add(box(t, H - 0.12, D, wall, W / 2 - t / 2, 0.12, 0));
   g.add(box(W - 0.01, 0.12, D + 0.004, mat(col), 0, 0.25, 0, false));
-  g.add(box(W - 2 * t, 0.05, D - 2 * t, prodMat(hash(p.sign || col), W, 'pack'), 0, H - 0.22, 0, false));
+  g.add(box(W - 2 * t, H - 0.32, D - 2 * t, mat('#dfe7ee'), 0, 0.12, 0, false));
+  const st = stockFor(p, W), plan = goodsPlan(p, 2);
+  const mid = 0;
+  st.shelf(plan[0], -W / 2 + t + 0.01, (plan[0] === plan[1] ? W / 2 : mid) - t - 0.01, H - 0.2, D / 2 - t - 0.01, -D / 2 + t + 0.01, 0.12, { rows: 6 });
+  if (plan[0] !== plan[1]) st.shelf(plan[1], mid + 0.01, W / 2 - t - 0.01, H - 0.2, D / 2 - t - 0.01, -D / 2 + t + 0.01, 0.12, { rows: 6 });
+  addStock(g, st);
   const lid = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.06, D - 0.06), glassMat);
   lid.rotation.x = -Math.PI / 2;
   lid.position.set(0, H - 0.01, 0);
@@ -240,6 +255,7 @@ B.fresh = (W, D, H, p) => {
   const col = p.color || '#5cc95c';
   const wood = mat('#b98652');
   g.add(box(W, H, 0.05, wood, 0, 0, -D / 2 + 0.025));
+  const st = stockFor(p, W);
   const tiers = 3;
   for (let i = 0; i < tiers; i++) {
     const depth = (D - 0.05) / tiers;
@@ -248,18 +264,15 @@ B.fresh = (W, D, H, p) => {
     g.add(box(W - 0.02, top, depth, wood, 0, 0, z));
     const crate = box(W - 0.08, 0.1, depth - 0.06, mat(col), 0, top, z);
     g.add(crate);
-    const prod = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), mat(lighten(col, 0.1)));
-    const k = Math.max(4, Math.floor((W - 0.1) / 0.11));
-    const inst = new THREE.InstancedMesh(prod.geometry, prod.material, k * 2);
-    const m4 = new THREE.Matrix4();
-    let n = 0;
-    for (let j = 0; j < k; j++) for (let r = 0; r < 2; r++) {
-      m4.makeTranslation(-W / 2 + 0.08 + j * (W - 0.16) / (k - 1 || 1), top + 0.14, z + (r ? 0.08 : -0.08));
-      inst.setMatrixAt(n++, m4);
+    const kinds = PRODUCE[(p.cats || [])[0]] || PRODUCE['Фрукты'];
+    const crates = W > 1 ? 2 : 1;
+    for (let c = 0; c < crates; c++) {
+      const cx0 = -W / 2 + 0.05 + c * (W - 0.1) / crates, cx1 = cx0 + (W - 0.1) / crates - 0.02;
+      if (crates > 1) g.add(box(0.02, 0.13, depth - 0.06, mat(darken(col, 0.25)), cx1 + 0.01, top, z, false));
+      st.pile(kinds[(i * crates + c) % kinds.length], cx0, cx1, z - depth / 2 + 0.04, z + depth / 2 - 0.04, top + 0.1);
     }
-    inst.castShadow = true;
-    g.add(inst);
   }
+  addStock(g, st);
   if (p.sign) {
     const s = signPlane(p.sign, W * 0.9, 0.18, col, contrastText(col));
     s.position.set(0, H - 0.15, -D / 2 + 0.055);
@@ -381,8 +394,12 @@ B.baskets = (W, D, H, p) => {
 B.tobacco = (W, D, H, p) => {
   const g = new THREE.Group();
   g.add(box(W, H, D, mat('#2f2f33')));
-  const pm = prodMat(hash('tob'), W, 'pack');
-  for (let y = 0.9; y < H - 0.15; y += 0.14) g.add(box(W - 0.08, 0.1, 0.02, pm, 0, y, D / 2 + 0.002, false));
+  const st = stockFor({ sign: 'Табак' }, W);
+  for (let y = 0.9; y < H - 0.15; y += 0.14) {
+    g.add(box(W - 0.06, 0.01, D - 0.04, mat('#55555c'), 0, y - 0.01, 0, false));
+    st.shelf('cig', -W / 2 + 0.04, W / 2 - 0.04, y, D / 2 + 0.002, D / 2 - 0.1, 0.11, { rows: 2 });
+  }
+  addStock(g, st);
   if (p.sign) {
     const s = signPlane(p.sign, W * 0.6, 0.14, '#2f2f33', '#ffffff');
     s.position.set(0, H - 0.1, D / 2 + 0.004);
@@ -409,7 +426,10 @@ B.bin = (W, D, H, p) => {
   g.add(box(W, H, t, c, 0, 0, D / 2 - t / 2));
   g.add(box(t, H, D, c, -W / 2 + t / 2, 0, 0));
   g.add(box(t, H, D, c, W / 2 - t / 2, 0, 0));
-  g.add(box(W - 2 * t, H * 0.6, D - 2 * t, prodMat(hash('promo'), W, 'pack'), 0, 0.05, 0));
+  g.add(box(W - 2 * t, H * 0.55, D - 2 * t, mat('#e0c070'), 0, 0.05, 0, false));
+  const st = stockFor(p, W), plan = goodsPlan(p, 1);
+  st.shelf(plan[0], -W / 2 + t, W / 2 - t, H * 0.6, D / 2 - t, -D / 2 + t, H * 0.4, { rows: 6 });
+  addStock(g, st);
   if (p.sign) {
     const s = signPlane(p.sign, W * 0.8, 0.14, p.color || '#ffcc33', '#1d2330');
     s.position.set(0, H - 0.2, D / 2 + 0.003);

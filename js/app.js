@@ -884,4 +884,4 @@ resize();
 $('#loading').remove();
 if (!store.get('store3d.seenHelp', false)) { store.set('store3d.seenHelp', true); setTimeout(help, 300); }
 frame();
-window.__app = { screenOf: id => { const o = objs.get(id); const v = new THREE.Vector3(o.it.x * M, 0.3, o.it.y * M).project(camera); const r = renderer.domElement.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; }, objs, snapshot, runChecks: () => (runChecks(), lastChecks), setMode, select, data };
+window.__app = { walkTo: (x, y, yaw, pitch = 0) => { setMode('walk'); Object.assign(walk, { x, y, yaw, pitch, init: true }); }, info: () => renderer.info.render, screenOf: id => { const o = objs.get(id); const v = new THREE.Vector3(o.it.x * M, 0.3, o.it.y * M).project(camera); const r = renderer.domElement.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; }, objs, snapshot, runChecks: () => (runChecks(), lastChecks), setMode, select, data };
